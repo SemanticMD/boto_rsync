@@ -185,6 +185,15 @@ def signal_handler(signum, frame):
         sys.stdout.write('\n')
         sys.exit(0)
 
+def update_metadata(k, metadata, metadata_mappings, file):
+    if metadata_mappings:
+        for mapping in metadata_mappings:
+            if re.match(mapping[0], file):
+                k.update_metadata(mapping[1])
+                break
+    else:
+        k.update_metadata(metadata)
+
 def main():
     global speeds, ev
     
@@ -238,6 +247,10 @@ def main():
              'so that SOURCE and DESTINATION can be read properly. e.g. ' + \
              '%(prog)s -m "Content-Type: audio/mpeg" "Content-Disposition: ' + \
              'attachment" -- ./path/ s3://bucket/'
+        )
+    parser.add_argument(
+        '-f', '--metadata-file', metavar='METAFILE', dest='metadata_file',
+        help=''
         )
     parser.add_argument(
         '-r', '--reduced', action='store_true',
@@ -331,6 +344,9 @@ def main():
         metadata = args.metadata
         if not isinstance(metadata, dict):
             metadata = dict([meta.split(': ', 1) for meta in metadata])
+        metadata_mappings = args.metadata_file
+        if metadata_mappings:
+            metadata_mappings = __import__(metadata_mappings).metadata_mappings
         reduced = args.reduced
         encrypt = args.encrypt
         preserve = args.preserve
@@ -591,7 +607,7 @@ def main():
                         
                         # Send the file
                         k = b.new_key(key_name)
-                        k.update_metadata(metadata)
+                        update_metadata(k, metadata, metadata_mappings, file)
                         if cloud_service == 'gs':
                             k.set_contents_from_filename(
                                 fullpath, cb=cb, num_cb=num_cb, policy=grant
@@ -701,7 +717,7 @@ def main():
                     
                     # Send the file
                     k = b.new_key(key_name)
-                    k.update_metadata(metadata)
+                    update_metadata(k, metadata, metadata_mappings, file)
                     if cloud_service == 'gs':
                         k.set_contents_from_filename(
                             path, cb=cb, num_cb=num_cb, policy=grant
