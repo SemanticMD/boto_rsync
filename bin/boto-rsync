@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/rob/.virtualenvs/erohisms/bin/python
 # Copyright (c) 2012 Seth Davis http://www.curiasolutions.com/
 # s3put is Copyright (c) 2006,2007,2008 Mitch Garnaat http://garnaat.org/
 #
@@ -21,11 +21,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 #
-import sys, os, time, datetime, argparse, threading, signal
+import sys, os, re, time, datetime, argparse, threading, signal, hashlib
 from fnmatch import fnmatch
 import boto
 
-__version__ = '0.8.1'
+__version__ = '0.9.0'
 
 version= """
 %(prog)s v%(version)s
@@ -46,6 +46,20 @@ examples:
  or
     boto-rsync [OPTIONS] s3://bucketname/ s3://another_bucket/
 """
+
+_md5_cache = {}
+
+def md5(file_path):
+    if not _md5_cache.has_key(file_path):
+        with open(file_path, 'rb') as fh:
+            m = hashlib.md5()
+            while True:
+                data = fh.read(8192)
+                if not data:
+                    break
+                m.update(data)
+            _md5_cache[file_path] = u'"%s"' % m.hexdigest()
+    return _md5_cache[file_path]
 
 def usage(parser):
     """Prints the usage string and exits."""
@@ -457,7 +471,7 @@ def main():
                     if glob and not fnmatch(key.name.split('/')[-1], glob):
                         continue
                     
-                    keys[key.name] = key.size
+                    keys[key.name] = key.etag
             except Exception, e:
                 raise e
             finally:
@@ -503,7 +517,7 @@ def main():
                              key_name.endswith('_$folder$'):
                             if not quiet:
                                 sys.stdout.write(
-                                    'Skipping %s (size matches)\n' %
+                                    'Skipping %s (md5 matches)\n' %
                                     key_name.replace('_$folder$', '/')
                                     )
                             create_dirkey = False
@@ -541,7 +555,6 @@ def main():
                     fullpath = os.path.join(root, file)
                     key_name = cloud_path + get_key_name(fullpath, path)
                     file_size = os.path.getsize(fullpath)
-                    
                     if file_size == 0:
                         if ignore_empty:
                             if not quiet:
@@ -559,10 +572,10 @@ def main():
                                     fullpath[len(path):].lstrip(os.sep)
                                     )
                             continue
-                        elif keys[key_name] == file_size:
+                        elif keys[key_name] == md5(fullpath):
                             if not quiet:
                                 sys.stdout.write(
-                                    'Skipping %s (size matches)\n' %
+                                    'Skipping %s (md5 matches)\n' %
                                     fullpath[len(path):].lstrip(os.sep)
                                     )
                             continue
@@ -589,7 +602,7 @@ def main():
                                 policy=grant, reduced_redundancy=reduced,
                                 encrypt_key=encrypt
                                 )
-                        keys[key_name] = file_size
+                        keys[key_name] = md5(fullpath)
                         
                         # Clean stdout
                         sys.stdout.write('\n')
@@ -621,7 +634,7 @@ def main():
                         if key_name in keys:
                             del(keys[key_name])
                 
-                for key_name, key_size in keys.iteritems():
+                for key_name, key_md5 in keys.iteritems():
                     sys.stdout.write(
                         'deleting %s\n' %
                         key_name[len(cloud_path):].replace('_$folder$', '/')
@@ -663,16 +676,16 @@ def main():
                         else:
                             sys.stdout.write('Skipping %s (not overwriting)\n' %
                                              filename)
-                elif key.size == file_size:
+                elif key.etag == md5(fullpath):
                     copy_file = False
                     if not quiet:
                         if filename != key_name.split('/')[-1]:
                             sys.stdout.write(
-                                'Skipping %s -> %s (size matches)\n' %
+                                'Skipping %s -> %s (md5 matches)\n' %
                                 filename, key_name.split('/')[-1]
                                 )
                         else:
-                            sys.stdout.write('Skipping %s (size matches)\n' %
+                            sys.stdout.write('Skipping %s (md5 matches)\n' %
                                              filename)
             
             if copy_file:
@@ -766,17 +779,17 @@ def main():
                                 fullpath.split(os.sep)[-1]
                                 )
                     copy_file = False
-                elif key.size == os.path.getsize(fullpath):
+                elif key.etag == md5(fullpath):
                     if not quiet:
                         if rename:
                             sys.stdout.write(
-                                'Skipping %s -> %s (size matches)\n' %
+                                'Skipping %s -> %s (md5 matches)\n' %
                                 keypath.replace('/', os.sep),
                                 fullpath.split(os.sep)[-1]
                                 )
                         else:
                             sys.stdout.write(
-                                'Skipping %s (size matches)\n' %
+                                'Skipping %s (md5 matches)\n' %
                                 fullpath.split(os.sep)[-1]
                                 )
                     copy_file = False
@@ -856,12 +869,12 @@ def main():
                                 fullpath[len(os.path.join(path, '')):]
                                 )
                         continue
-                    elif key.size == os.path.getsize(fullpath) or \
+                    elif key.etag == md5(fullpath) or \
                          key.name.endswith('/') or \
                          key.name.endswith('_$folder$'):
                         if not quiet:
                             sys.stdout.write(
-                                'Skipping %s (size matches)\n' %
+                                'Skipping %s (md5 matches)\n' %
                                 fullpath[len(os.path.join(path, '')):]
                                 )
                         continue
@@ -976,16 +989,16 @@ def main():
                                 'Skipping %s (not overwriting)\n' % fullpath
                                 )
                     copy_file = False
-                elif key.size == dest_key.size:
+                elif key.etag == dest_key.etag:
                     if not quiet:
                         if rename:
                             sys.stdout.write(
-                                'Skipping %s -> %s (size matches)\n' %
+                                'Skipping %s -> %s (md5 matches)\n' %
                                 keypath.split('/')[-1], fullpath.split('/')[-1]
                                 )
                         else:
                             sys.stdout.write(
-                                'Skipping %s (size matches)\n' % fullpath
+                                'Skipping %s (md5 matches)\n' % fullpath
                                 )
                     copy_file = False
             
@@ -1084,10 +1097,10 @@ def main():
                                 fullpath.replace('_$folder$', '/')
                                 )
                         continue
-                    elif key.size == dest_key.size:
+                    elif key.etag == dest_key.etag:
                         if not quiet:
                             sys.stdout.write(
-                                'Skipping %s (size matches)\n' %
+                                'Skipping %s (md5 matches)\n' %
                                 fullpath.replace('_$folder$', '/')
                                 )
                         continue
