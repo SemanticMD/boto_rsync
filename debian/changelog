@@ -1,0 +1,5 @@
+boto-rsync (0.8.1-1) unstable; urgency=low
+
+  * source package automatically created by stdeb 0.6.0+git
+
+ -- Seth Davis <seth@curiasolutions.com>  Mon, 14 Jul 2014 14:01:22 +1000

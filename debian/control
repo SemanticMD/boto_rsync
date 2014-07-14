@@ -1,0 +1,31 @@
+Source: boto-rsync
+Maintainer: Seth Davis <seth@curiasolutions.com>
+Section: python
+Priority: optional
+Build-Depends: python-all (>= 2.6.6-3), debhelper (>= 7.4.3)
+Standards-Version: 3.9.1
+
+Package: python-boto-rsync
+Architecture: all
+Depends: ${misc:Depends}, ${python:Depends}
+Description: An rsync-like wrapper for boto's S3 and Google Storage inter
+ ================================================================================
+ boto rsync v0.8.1
+ ================================================================================
+ .
+ | Copyright: (c) 2012 Seth Davis
+ | http://github.com/seedifferently/boto_rsync
+ .
+ .
+ Synopsis
+ ================================================================================
+ .
+ boto-rsync is a rough adaptation of boto's s3put script which has been
+ reengineered to more closely mimic rsync. Its goal is to provide a familiar
+ rsync-like wrapper for boto's S3 and Google Storage interfaces.
+ .
+ By default, the script works recursively and differences between files are
+ checked by comparing file sizes (e.g. rsync's --recursive and --size-only
+ options). If the file exists on the destination but its size differs from
+ the source, then it will be overwritten (unless the -w option is used).
+ .
