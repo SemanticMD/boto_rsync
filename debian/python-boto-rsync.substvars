@@ -1,0 +1,4 @@
+python:Versions=2.7
+python:Provides=python2.7-boto-rsync
+python:Depends=python2.7, python (>= 2.7), python (<< 2.8), python
+misc:Depends=
